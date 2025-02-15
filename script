@@ -1,0 +1,57 @@
+import os
+from pydub import AudioSegment
+import ffmpeg
+
+# Set paths
+input_folder = "mp3_folder"  # Change this to your folder path
+output_mp3 = "merged_audio.mp3"
+output_mp4 = "final_output.mp4"
+cover_image = "cover.jpg"  # The image to use as the cover
+
+# Ensure input folder exists
+if not os.path.exists(input_folder):
+    raise FileNotFoundError(f"Error: The folder '{input_folder}' does not exist!")
+
+# Step 1: Merge all MP3 files
+audio_files = sorted([f for f in os.listdir(input_folder) if f.endswith(".mp3")])
+
+if not audio_files:
+    raise ValueError("No MP3 files found in the folder!")
+
+# Load and concatenate audio files
+merged_audio = AudioSegment.empty()
+for file in audio_files:
+    audio_path = os.path.join(input_folder, file)
+    try:
+        audio_segment = AudioSegment.from_mp3(audio_path)
+        merged_audio += audio_segment
+    except Exception as e:
+        print(f"⚠ Warning: Skipping {file} due to an error - {e}")
+
+# Export merged audio
+merged_audio.export(output_mp3, format="mp3", bitrate="192k")
+print(f"✔ Merged {len(audio_files)} MP3s into {output_mp3}")
+
+# Step 2: Convert MP3 to MP4 with Cover Image
+if not os.path.exists(cover_image):
+    raise FileNotFoundError("Error: Cover image not found!")
+
+try:
+    ffmpeg.input(output_mp3).output(
+        output_mp4,
+        loop=1,  # Keeps the image static throughout the video
+        r=1,  # Frame rate (1 frame per second)
+        vf="scale=1280:720",  # Resize image to 720p
+        vcodec="libx264",
+        acodec="aac",
+        b="192k",
+        pix_fmt="yuv420p",
+        shortest=True  # Ensures the video ends when audio ends
+    ).run(overwrite_output=True)
+
+    print(f"✔ Final MP4 created: {output_mp4}")
+
+except ffmpeg.Error as e:
+    print(f"❌ FFmpeg Error: {e.stderr.decode()}")
+    raise RuntimeError("Failed to create MP4. Check your FFmpeg installation and inputs.")
+
